@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -11,6 +12,8 @@ namespace emulator_helper
 {
     class Program
     {
+        public static string emulatorPath = "C:\\dark\\emu\\DarkOrbit 10.0\\bin\\Debug\\dark_orbit.exe";
+        public static string rankingCronjobUrl = "http://yourserverurl.com/cronjobs/ranking";
         public static DateTime cronjobTime = new DateTime();
 
         static void Main(string[] args)
@@ -25,43 +28,70 @@ namespace emulator_helper
 
                 if (runningProcess.Length == 0)
                 {
-                    /* try-catch prevent stack error */
-                    try
-                    {
-                        run_server();
-                    } catch
-                    {
-                        Console.WriteLine(error_msg(100));
-                    }
-
-                    //Process.Start("C:\\Users\\Yusuf\\Desktop\\darkorbit-emulators\\DarkOrbit 10.0\\bin\\Debug\\darkorbit.exe");
+                    run_server();
                 }
 
                 if (cronjobTime.AddHours(1) < DateTime.Now)
                 {
-                    Console.WriteLine($"[{DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")}] - Ranks updated.");
-                    new WebClient().DownloadString("http://infinityorbit.com/cronjobs/ranking");
-                    cronjobTime = DateTime.Now;
+                    run_cronjob();
                 }
             }
         }
-        
+
         static void run_server()
         {
-            Console.WriteLine($"[{DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")}] - Emulator started.");
-            Process.Start("C:\\dark\\emu\\DarkOrbit 10.0\\bin\\Debug\\dark_orbit.exe");
-        }
-        
-        static string error_msg(int error_code)
-        {
-            switch (error_code) {
+            try
+            {
+                if (!File.Exists(emulatorPath))
+                {
+                    throw new FileNotFoundException();
+                }
 
+                Process.Start(emulatorPath);
+
+                Console.WriteLine($"[{DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")}] - Emulator started.");
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine(error_msg(100));
+            }
+            catch
+            {
+                Console.WriteLine(error_msg() + " - run_server()");
+            }
+        }
+
+        static void run_cronjob()
+        {
+            try
+            {
+                new WebClient().DownloadString(rankingCronjobUrl);
+                cronjobTime = DateTime.Now;
+
+                Console.WriteLine($"[{DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")}] - Ranks updated.");
+            }
+            catch (WebException)
+            {
+                Console.WriteLine(error_msg(101));
+            }
+            catch
+            {
+                Console.WriteLine(error_msg() + " - run_cronjob()");
+            }
+        }
+
+        static string error_msg(int error_code = -1)
+        {
+            var emulatorName = Path.GetFileName(emulatorPath);
+
+            switch (error_code)
+            {
                 case 100:
-                    return "Darkorbit.exe not found - Please update Path in Sourcecode!";
-                    break;
+                    return (string.IsNullOrEmpty(emulatorName) ? "Emulator" : emulatorName) + " not found - please update the emulator path in source code!";
+                case 101:
+                    return "Cronjob url for ranking does not working!";
                 default:
-                    return "0";
-                    break;
+                    return "Something went wrong!";
             }
         }
     }
